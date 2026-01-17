@@ -29,8 +29,8 @@ def home():
 
 @app.get("/posts")
 def list_posts(
-    query: Optional[str] = Query(  ##Optional[str] == str | None
-        default=None, description="texto para buscar por titulo"
+    query: Optional[str] = Query(  
+        default=None, description="texto para buscar por titulo" ##Optional[str] == str | None
     ),
 ):  # la query debe de ser de tipo str o none
     if query:
