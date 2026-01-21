@@ -78,10 +78,17 @@ def update_post(post_id: int, data: dict = Body(...)):
             if "content" in data:
                 post["content"] = data["content"]
             return {"message": "Post actualizado", "data": post}
-        
-        raise HTTPException(status_code = 404, detail="Post no encontrado")
+
+        raise HTTPException(status_code=404, detail="Post no encontrado")
 
 
+@app.delete("/posts/{post_id}", status_code=204)
+def delete_post(post_id: int):
+    for index, post in enumerate(BLOG_POST):
+        if post["id"] == post_id:
+            BLOG_POST.pop(index)
+            return
+    raise HTTPException(status_code=404, detail="Post no encontrado")
 
 
 # .\.venv\Scripts\activate.ps1 -> activa el .venv
