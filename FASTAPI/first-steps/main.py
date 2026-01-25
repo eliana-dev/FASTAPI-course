@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Query, Body, HTTPException
 from typing import Optional
+from pydantic import BaseModel
 
 app = FastAPI(title="Mini Blog")
 
@@ -20,6 +21,11 @@ BLOG_POST = [
         "Content": "Mi tercer post con fastAPI",
     },
 ]
+
+
+class Post(BaseModel):
+    title: str
+    content: str
 
 
 @app.get("/")
@@ -56,17 +62,18 @@ def get_post(
 
 
 @app.post("/posts")
-def create_post(post: dict = Body(...)):  # (...): obligatorio
-    if "title" not in post or "content" not in post:
-        return {"error": "Title y Content son requeridos"}
+def create_post(post:Post):
+    return {"data": post}# (...): obligatorio
+    # if "title" not in post or "content" not in post:
+    #     return {"error": "Title y Content son requeridos"}
 
-    if not str(post["title"]).strip():
-        return {"error": "title no puede estar vacio"}
+    # if not str(post["title"]).strip():
+    #     return {"error": "title no puede estar vacio"}
 
-    new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
-    new_post = {"id": new_id, "title": post["title"], "content": post["content"]}
-    BLOG_POST.append(new_post)
-    return {"message": "Post creado", "data": new_post}
+    # new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
+    # new_post = {"id": new_id, "title": post["title"], "content": post["content"]}
+    # BLOG_POST.append(new_post)
+    # return {"message": "Post creado", "data": new_post}
 
 
 @app.put("/posts/{post_id}")
