@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Query, Body, HTTPException
 from typing import Optional
 from pydantic import BaseModel
-
+import uvicorn
 app = FastAPI(title="Mini Blog")
 
 BLOG_POST = [
@@ -34,7 +34,7 @@ class PostCreate(PostBase):
 
 class PostUpdate(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = None
 
 
 @app.get("/")
@@ -100,9 +100,5 @@ def delete_post(post_id: int):
             return
     raise HTTPException(status_code=404, detail="Post no encontrado")
 
-
-# .\.venv\Scripts\activate.ps1 -> activa el .venv
-# uv run uvicorn main:app --reload - inicia el servidor
-#  fastapi dev main.py
-# evita usar run
-# curl -X POST http://127.0.0.1:8000/posts -H "Content-Type: application/json" -d '{"title": "Nuevo post desde curl", "content": "Mi nuevo post desde curl"}'
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
