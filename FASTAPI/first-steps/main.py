@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, HTTPException
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import uvicorn
 
 app = FastAPI(title="Mini Blog")
@@ -43,6 +43,13 @@ class PostCreate(BaseModel):
         description="Contenido del Post",
         examples=["Este es un contenido valido por que tiene 10 caracteres o más"],
     )
+
+    @field_validator("title")  # evalua el campo titulo
+    @classmethod  # ocupa la clase (nombre del modelo, manipula el valor a nivel clase)
+    def not_allowed_title(cls, value: str) -> str:
+        if "spam" in value.lower():
+            raise ValueError("El titulo no puede contener la palabra: span")
+        return value
 
 
 class PostUpdate(BaseModel):
