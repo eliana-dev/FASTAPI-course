@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, HTTPException
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 import uvicorn
 
@@ -23,10 +23,12 @@ BLOG_POST = [
     },
 ]
 
+BAD_WORDS = ["porn", "xxx", "tits", "boobs", "dick", "cock", "pussy", "coochie"]
+
 
 class PostBase(BaseModel):
     title: str
-    content: str
+    content: Optional[str] = "Contenido no disponible"
 
 
 class PostCreate(BaseModel):
@@ -47,9 +49,13 @@ class PostCreate(BaseModel):
     @field_validator("title")  # evalua el campo titulo
     @classmethod  # ocupa la clase (nombre del modelo, manipula el valor a nivel clase)
     def not_allowed_title(cls, value: str) -> str:
-        if "spam" in value.lower():
-            raise ValueError("El titulo no puede contener la palabra: span")
+        for word in BAD_WORDS:
+            if word in value.lower():
+                raise ValueError(f"El titulo no puede contener la palabra: {word}")
         return value
+        # if "spam" in value.lower():
+        #     raise ValueError("El titulo no puede contener la palabra: spam")
+        # return value
 
 
 class PostUpdate(BaseModel):
@@ -57,12 +63,23 @@ class PostUpdate(BaseModel):
     content: Optional[str] = None
 
 
+class PostPublic(PostBase):  # hereda title y content
+    id: int
+
+
+class PostSummary(BaseModel):
+    id: int
+    title: str
+
+
 @app.get("/")
 def home():
     return {"message": "Bienvenidos a mini blog!"}
 
 
-@app.get("/posts")
+@app.get(
+    "/posts", response_model=List[PostPublic]
+)  # una lista de muchos postPublic es la response
 def list_posts(
     query: Optional[str] = Query(
         default=None, description="texto para buscar por titulo"
@@ -70,8 +87,8 @@ def list_posts(
 ):
     if query:
         results = [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-        return {"data": results, "query": query}
-    return {"data": BLOG_POST}
+        return results # devuelve una List
+    return BLOG_POST #Aca tambien
 
 
 @app.get("/posts/{post_id}")  ##query parameter: include_content=false
