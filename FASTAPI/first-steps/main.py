@@ -23,12 +23,27 @@ BLOG_POST = [
     },
 ]
 
+
+class Tag(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=30,
+        description="Nombre de la etiqueta",
+    )
+
+class Author(BaseModel):
+    name: str=Field(..., min_length=2, max_length=30,description="Nombre del autor del post")
+    email: str=Field(..., min_length=11, max_length=30, description="Email del autor del post") 
+
 BAD_WORDS = ["porn", "xxx", "tits", "boobs", "dick", "cock", "pussy", "coochie"]
 
 
 class PostBase(BaseModel):
     title: str
     content: str
+    tags: Optional[List[Tag]]=[]
+    author: Optional[Author] = {}
 
 
 class PostCreate(BaseModel):
@@ -45,6 +60,8 @@ class PostCreate(BaseModel):
         description="Contenido del Post",
         examples=["Este es un contenido valido por que tiene 10 caracteres o más"],
     )
+    tags: List[Tag] = []
+    author: Optional[Author] = {}
 
     @field_validator("title")  # evalua el campo titulo
     @classmethod  # ocupa la clase (nombre del modelo, manipula el valor a nivel clase)
@@ -87,11 +104,15 @@ def list_posts(
 ):
     if query:
         results = [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-        return results # devuelve una List
-    return BLOG_POST #Aca tambien
+        return results  # devuelve una List
+    return BLOG_POST  # Aca tambien
 
 
-@app.get("/posts/{post_id}", response_model=Union[PostPublic, PostSummary], response_description="Post Encontrado")#evalua ambos modelos con Union, para elegir el modelo de respuesta
+@app.get(
+    "/posts/{post_id}",
+    response_model=Union[PostPublic, PostSummary],
+    response_description="Post Encontrado",
+)  # evalua ambos modelos con Union, para elegir el modelo de respuesta
 def get_post(
     post_id: int,
     include_content: Optional[bool] = Query(
@@ -104,18 +125,29 @@ def get_post(
                 return {"id": post["id"], "title": post["title"]}
             return post
 
-    return HTTPException(status_code=404,detail="Post no encontrado" )
+    return HTTPException(status_code=404, detail="Post no encontrado")
 
 
 @app.post("/posts", response_model=PostPublic, response_description="Post Creado(OK)")
 def create_post(post: PostCreate):
     new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
-    new_post = {"id": new_id, "title": post.title, "content": post.content}
+    new_post = {
+        "id": new_id,
+        "title": post.title,
+        "content": post.content,
+        "tags": [tag.model_dump() for tag in post.tags],
+        "author": (post.author).model_dump()
+    }
     BLOG_POST.append(new_post)
     return new_post
 
 
-@app.put("/posts/{post_id}", response_model=PostPublic, response_description="Post actualizado", response_model_exclude_none=True)
+@app.put(
+    "/posts/{post_id}",
+    response_model=PostPublic,
+    response_description="Post actualizado",
+    response_model_exclude_none=True,
+)
 def update_post(post_id: int, data: PostUpdate):
     for post in BLOG_POST:
         if post["id"] == post_id:
@@ -142,3 +174,5 @@ def delete_post(post_id: int):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+# clase autor, enlasarla con los post como los tags: autor = nombre y email
