@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, HTTPException
 from typing import Optional, List, Union
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr
 import uvicorn
 
 app = FastAPI(title="Mini Blog")
@@ -32,9 +32,13 @@ class Tag(BaseModel):
         description="Nombre de la etiqueta",
     )
 
+
 class Author(BaseModel):
-    name: str=Field(..., min_length=2, max_length=30,description="Nombre del autor del post")
-    email: str=Field(..., min_length=11, max_length=30, description="Email del autor del post") 
+    name: str = Field(
+        ..., min_length=2, max_length=30, description="Nombre del autor del post"
+    )
+    email: EmailStr = Field(..., description="Email del autor del post")
+
 
 BAD_WORDS = ["porn", "xxx", "tits", "boobs", "dick", "cock", "pussy", "coochie"]
 
@@ -42,8 +46,8 @@ BAD_WORDS = ["porn", "xxx", "tits", "boobs", "dick", "cock", "pussy", "coochie"]
 class PostBase(BaseModel):
     title: str
     content: str
-    tags: Optional[List[Tag]]=[]
-    author: Optional[Author] = {}
+    tags: Optional[List[Tag]] = []
+    author: Optional[Author] = None
 
 
 class PostCreate(BaseModel):
@@ -61,8 +65,8 @@ class PostCreate(BaseModel):
         examples=["Este es un contenido valido por que tiene 10 caracteres o más"],
     )
     tags: List[Tag] = []
-    author: Optional[Author] = {}
-
+    author: Optional[Author] = None
+    
     @field_validator("title")  # evalua el campo titulo
     @classmethod  # ocupa la clase (nombre del modelo, manipula el valor a nivel clase)
     def not_allowed_title(cls, value: str) -> str:
@@ -136,7 +140,7 @@ def create_post(post: PostCreate):
         "title": post.title,
         "content": post.content,
         "tags": [tag.model_dump() for tag in post.tags],
-        "author": (post.author).model_dump()
+        "author": post.author.model_dump() if post.author else None,
     }
     BLOG_POST.append(new_post)
     return new_post
