@@ -46,7 +46,7 @@ BAD_WORDS = ["porn", "xxx", "tits", "boobs", "dick", "cock", "pussy", "coochie"]
 class PostBase(BaseModel):
     title: str
     content: str
-    tags: Optional[List[Tag]] = []
+    tags: Optional[List[Tag]] = Field(default_factory=list)
     author: Optional[Author] = None
 
 
@@ -64,7 +64,7 @@ class PostCreate(BaseModel):
         description="Contenido del Post",
         examples=["Este es un contenido valido por que tiene 10 caracteres o más"],
     )
-    tags: List[Tag] = []
+    tags: List[Tag] = Field(default_factory=list)
     author: Optional[Author] = None
     
     @field_validator("title")  # evalua el campo titulo
