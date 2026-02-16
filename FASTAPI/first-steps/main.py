@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Path
 from typing import Optional, List, Union
 from pydantic import BaseModel, Field, field_validator, EmailStr
 import uvicorn
@@ -66,7 +66,7 @@ class PostCreate(BaseModel):
     )
     tags: List[Tag] = Field(default_factory=list)
     author: Optional[Author] = None
-    
+
     @field_validator("title")  # evalua el campo titulo
     @classmethod  # ocupa la clase (nombre del modelo, manipula el valor a nivel clase)
     def not_allowed_title(cls, value: str) -> str:
@@ -80,7 +80,7 @@ class PostCreate(BaseModel):
 
 
 class PostUpdate(BaseModel):
-    title: str
+    title: Optional[str] = Field(None, min_length=3, max_length=100)
     content: Optional[str] = None
 
 
@@ -103,7 +103,12 @@ def home():
 )  # una lista de muchos postPublic es la response
 def list_posts(
     query: Optional[str] = Query(
-        default=None, description="texto para buscar por titulo"
+        default=None,
+        description="texto para buscar por titulo",
+        alias="search",  ##alias para el query (var)
+        min_length=3,
+        max_length=50,
+        pattern= r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
     ),
 ):
     if query:
@@ -118,7 +123,13 @@ def list_posts(
     response_description="Post Encontrado",
 )  # evalua ambos modelos con Union, para elegir el modelo de respuesta
 def get_post(
-    post_id: int,
+    post_id: int = Path(
+        ...,
+        ge=1,
+        title="ID del post",
+        description="Identificador entero del post - mayor a 1",
+        example=1,
+    ),
     include_content: Optional[bool] = Query(
         default=None, description="Bool para filtrar contenido"
     ),
