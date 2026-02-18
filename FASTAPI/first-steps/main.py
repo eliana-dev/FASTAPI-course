@@ -153,13 +153,20 @@ class PostSummary(BaseModel):
     title: str
 
 
+class PaginatedPost(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    items: list[PostPublic]
+
+
 @app.get("/")
 def home():
     return {"message": "Bienvenidos a mini blog!"}
 
 
 @app.get(
-    "/posts", response_model=List[PostPublic]
+    "/posts", response_model=PaginatedPost
 )  # una lista de muchos postPublic es la response
 def list_posts(
     query: Optional[str] = Query(
@@ -195,10 +202,13 @@ def list_posts(
 
     if query:
         results = [post for post in results if query.lower() in post["title"].lower()]
+    total = len(results)
     results = sorted(
         results, key=lambda post: post[order_by], reverse=(direction == "desc")
     )
-    return results[offset : offset + limit]
+    items = results[offset : offset + limit]
+
+    return PaginatedPost(total=total, limit=limit, offset=offset, items=items)
 
 
 @app.get(
