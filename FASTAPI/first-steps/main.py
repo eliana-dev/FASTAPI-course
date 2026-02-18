@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Query, HTTPException, Path
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Literal
 from pydantic import BaseModel, Field, field_validator, EmailStr
 import uvicorn
 
@@ -18,6 +18,66 @@ BLOG_POST = [
     },
     {
         "id": 3,
+        "title": "Holiwis yeii",
+        "content": "Mi tercer post con fastAPI",
+    },
+    {
+        "id": 4,
+        "title": "Hola desde FastAPI",
+        "content": "Mi primer post con fastAPI",
+    },
+    {
+        "id": 5,
+        "title": "Me gusta el chocolate",
+        "content": "Mi segundo post con fastAPI",
+    },
+    {
+        "id": 6,
+        "title": "Holiwis yeii",
+        "content": "Mi tercer post con fastAPI",
+    },
+    {
+        "id": 7,
+        "title": "Hola desde FastAPI",
+        "content": "Mi primer post con fastAPI",
+    },
+    {
+        "id": 8,
+        "title": "Me gusta el chocolate",
+        "content": "Mi segundo post con fastAPI",
+    },
+    {
+        "id": 9,
+        "title": "Holiwis yeii",
+        "content": "Mi tercer post con fastAPI",
+    },
+    {
+        "id": 10,
+        "title": "Me gusta el chocolate",
+        "content": "Mi segundo post con fastAPI",
+    },
+    {
+        "id": 11,
+        "title": "Holiwis yeii",
+        "content": "Mi tercer post con fastAPI",
+    },
+    {
+        "id": 12,
+        "title": "Me gusta el chocolate",
+        "content": "Mi segundo post con fastAPI",
+    },
+    {
+        "id": 13,
+        "title": "Holiwis yeii",
+        "content": "Mi tercer post con fastAPI",
+    },
+    {
+        "id": 14,
+        "title": "Me gusta el chocolate",
+        "content": "Mi segundo post con fastAPI",
+    },
+    {
+        "id": 15,
         "title": "Holiwis yeii",
         "content": "Mi tercer post con fastAPI",
     },
@@ -108,13 +168,37 @@ def list_posts(
         alias="search",  ##alias para el query (var)
         min_length=3,
         max_length=50,
-        pattern= r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$"
+        pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$",
+    ),
+    limit: int = Query(
+        10,
+        ge=1,
+        le=50,
+        description="Numero de resultados (1-50)",
+    ),
+    offset: int = Query(
+        0,
+        ge=0,
+        description="Elementos a saltar antes de empezar la lista",
+    ),
+    order_by: Literal["id", "title"] = Query(
+        "id",
+        description="Campo de orden",
+    ),
+    direction: Literal["asc", "desc"] = Query(
+        "asc",
+        description="Dirección de orden",
     ),
 ):
+
+    results = BLOG_POST
+
     if query:
-        results = [post for post in BLOG_POST if query.lower() in post["title"].lower()]
-        return results  # devuelve una List
-    return BLOG_POST  # Aca tambien
+        results = [post for post in results if query.lower() in post["title"].lower()]
+    results = sorted(
+        results, key=lambda post: post[order_by], reverse=(direction == "desc")
+    )
+    return results[offset : offset + limit]
 
 
 @app.get(
