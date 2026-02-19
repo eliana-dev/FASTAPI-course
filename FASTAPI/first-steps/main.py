@@ -191,6 +191,11 @@ def home():
     "/posts", response_model=PaginatedPost
 )  # una lista de muchos postPublic es la response
 def list_posts(
+    text: Optional[str] = Query(
+        default=None,
+        deprecated=True,
+        description="Parámetro obsoleto, usa 'query o search' en su lugar.",
+    ),
     query: Optional[str] = Query(
         default=None,
         description="texto para buscar por titulo",
@@ -221,6 +226,7 @@ def list_posts(
 ):
 
     results = BLOG_POST
+    query = query or text
 
     if query:
         results = [post for post in results if query.lower() in post["title"].lower()]
