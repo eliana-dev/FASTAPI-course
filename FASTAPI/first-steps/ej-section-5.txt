@@ -1,0 +1,42 @@
+{
+"page": 2, int --- segunda sección, pagina que vez actualmente
+***"per_page": 3, int --- elementos que hay por pagina[LIMIT]
+***"total": 8,int --- registros que hay con los parámetros que buscas
+"total_pages":3, int ---cantidad de paginas que hay según el per_page(si hay 8 y mostras 3, hay 3 paginas)
+"has_prev": true, BOOL -- hay pagina anterior
+"has_next":true, BOOL --- hay pagina siguiente
+"order_by": "title", STR
+"direction": "asc",
+"search": "fastapi",
+*****"**ítems": ## ya resuelta
+    [
+ 	{
+ 	"id": 4,
+ 	"title": "FastAPI avanzado",
+ 	"content": "Ejemplo de post avanzado"
+ 	},
+ 	{
+ 	"id": 5,
+ 	"title": "FastAPI avanzado",
+ 	"content": "Ejemplo de post avanzado"
+ 	},
+ 	{
+ 	"id": 6,
+ 	"title": "FastAPI avanzado",
+ 	"content": "Ejemplo de post avanzado"
+ 	}
+     ]
+}
+
+offset se elimina
+limit se cambia de nombre
+Cambiar la clase de paginatedPost
+----
+se agrega:
+page: int
+total_pages: int (se obtiene con total y per_pages)
+has_prev: bool
+has_next: bool
+order_by: str (ya están para elegir esos)
+direction: str (ya están para elegir esos)
+search (ya están para elegir)

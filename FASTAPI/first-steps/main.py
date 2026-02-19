@@ -2,6 +2,7 @@ from fastapi import FastAPI, Query, HTTPException, Path
 from typing import Optional, List, Union, Literal
 from pydantic import BaseModel, Field, field_validator, EmailStr
 import uvicorn
+from math import ceil
 
 app = FastAPI(title="Mini Blog")
 
@@ -10,6 +11,11 @@ BLOG_POST = [
         "id": 1,
         "title": "Hola desde FastAPI",
         "content": "Mi primer post con fastAPI",
+        "tags": [
+            {"name": "Python"},
+            {"name": "FastAPI"},
+            {"name": "Flask"},
+        ],
     },
     {
         "id": 2,
@@ -25,6 +31,11 @@ BLOG_POST = [
         "id": 4,
         "title": "Hola desde FastAPI",
         "content": "Mi primer post con fastAPI",
+        "tags": [
+            {"name": "Python"},
+            {"name": "FastAPI"},
+            {"name": "Flask"},
+        ],
     },
     {
         "id": 5,
@@ -50,6 +61,11 @@ BLOG_POST = [
         "id": 9,
         "title": "Holiwis yeii",
         "content": "Mi tercer post con fastAPI",
+        "tags": [
+            {"name": "Python"},
+            {"name": "FastAPI"},
+            {"name": "Flask"},
+        ],
     },
     {
         "id": 10,
@@ -154,9 +170,15 @@ class PostSummary(BaseModel):
 
 
 class PaginatedPost(BaseModel):
+    page: int
+    per_page: int  # limit
     total: int
-    limit: int
-    offset: int
+    total_pages: int
+    has_prev: bool
+    has_next: bool
+    order_by: Literal["id", "title"]
+    direction: Literal["asc", "desc"]
+    search: Optional[str] = None
     items: list[PostPublic]
 
 
@@ -177,16 +199,16 @@ def list_posts(
         max_length=50,
         pattern=r"^[\w\sáéíóúÁÉÍÓÚüÜ-]+$",
     ),
-    limit: int = Query(
+    per_page: int = Query(
         10,
         ge=1,
         le=50,
         description="Numero de resultados (1-50)",
     ),
-    offset: int = Query(
-        0,
-        ge=0,
-        description="Elementos a saltar antes de empezar la lista",
+    page: int = Query(
+        1,
+        ge=1,
+        description="Número de página (Mayor o igual a uno)",
     ),
     order_by: Literal["id", "title"] = Query(
         "id",
@@ -202,13 +224,53 @@ def list_posts(
 
     if query:
         results = [post for post in results if query.lower() in post["title"].lower()]
+
     total = len(results)
+    total_pages = ceil(total / per_page) if total > 0 else 0
+
+    if total_pages == 0:
+        current_pages = 1
+    else:
+        current_pages = min(page, total_pages)
     results = sorted(
         results, key=lambda post: post[order_by], reverse=(direction == "desc")
     )
-    items = results[offset : offset + limit]
+    if total_pages == 0:
+        items = []
+    else:
+        start = (current_pages - 1) * per_page
+        items = results[start : start + per_page]
+    has_prev = current_pages > 1
+    has_next = current_pages < total_pages if total_pages > 0 else False
+    return PaginatedPost(
+        page=current_pages,
+        per_page=per_page,
+        total=total,
+        total_pages=total_pages,
+        has_prev=has_prev,
+        has_next=has_next,
+        order_by=order_by,
+        direction=direction,
+        search=query,
+        items=items,
+    )
 
-    return PaginatedPost(total=total, limit=limit, offset=offset, items=items)
+
+@app.get("/posts/by-tags", response_model=List[PostPublic])
+def filter_by_tags(
+    tags: List[str] = Query(
+        ...,
+        min_length=1,
+        description="Una o más etiquetas. Ejemplo: ?tags=python&tags=fastapi",
+    ),
+):
+    tags_lower = [tag.lower() for tag in tags]
+
+    return [
+        post
+        for post in BLOG_POST
+        if any(tag["name"].lower() in tags_lower for tag in post.get("tags", []))
+    ]
 
 
 @app.get(
@@ -283,5 +345,3 @@ def delete_post(post_id: int):
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
-# clase autor, enlasarla con los post como los tags: autor = nombre y email
