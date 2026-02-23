@@ -1,9 +1,66 @@
+import os
+from datetime import datetime
 from fastapi import FastAPI, Query, HTTPException, Path
 from typing import Optional, List, Union, Literal
 from pydantic import BaseModel, Field, field_validator, EmailStr
 import uvicorn
 from math import ceil
+from sqlalchemy import create_engine, Integer, String, Text, DateTime
+from sqlalchemy.orm import (
+    sessionmaker,
+    Session,
+    declarative_base,
+    Mapped,
+    mapped_column,
+)
 
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")  ##motor://ruta
+print("Conectado a: ", DATABASE_URL)
+
+engine_kwargs = {}
+
+if DATABASE_URL.startswith("sqlite"):
+    engine_kwargs["connect_args"] = {
+        "check_same_thread": False
+    }  ##permite que varios threads usen esta conexión
+
+engine = create_engine(
+    DATABASE_URL, echo=True, future=True, **engine_kwargs
+)  # engine: El objeto que maneja la conexión real a la base de datos.
+# echo= muestra por consola las querys a la bd, future= usa la API moderna de sqlAlchemy.
+
+SessionLocal = sessionmaker(
+    bind=engine, autoflush=False, autocommit=False, class_=Session
+)
+# session: forma con la que se interactua con la bd
+# bind=engine: conecta la sesion con ese engine
+
+
+class Base(declarative_base):
+    pass
+
+
+class PostORM(Base):
+    __tablename__ = "posts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    title: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    create_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+Base.metadata.create_all(bind=engine)  # crea tablas en caso de que mo existan - dev
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db  # igual a return pero no finaliza la ejecución [PAUSA]
+    finally:
+        db.close()
+
+
+############# fin de db config ###################33
 app = FastAPI(title="Mini Blog")
 
 BLOG_POST = [
