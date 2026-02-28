@@ -1,18 +1,13 @@
 import os
 from datetime import datetime
-from fastapi import FastAPI, Query, HTTPException, Path
+from fastapi import FastAPI, Query, HTTPException, Path, status, Depends
 from typing import Optional, List, Union, Literal
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator, EmailStr, ConfigDict
 import uvicorn
 from math import ceil
-from sqlalchemy import create_engine, Integer, String, Text, DateTime
-from sqlalchemy.orm import (
-    sessionmaker,
-    Session,
-    declarative_base,
-    Mapped,
-    mapped_column,
-)
+from sqlalchemy import create_engine, Integer, String, Text, DateTime, select, func
+from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.exc import SQLAlchemyError
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")  ##motor://ruta
 print("Conectado a: ", DATABASE_URL)
@@ -36,7 +31,7 @@ SessionLocal = sessionmaker(
 # bind=engine: conecta la sesion con ese engine
 
 
-class Base(declarative_base):
+class Base(DeclarativeBase):
     pass
 
 
@@ -220,6 +215,10 @@ class PostUpdate(BaseModel):
 class PostPublic(PostBase):  # hereda title y content
     id: int
 
+    model_config = ConfigDict(
+        from_attributes=True
+    )  # pydantic entienda que recibe un obj de sqlAlchemy y lo convierte en un json
+
 
 class PostSummary(BaseModel):
     id: int
@@ -280,29 +279,38 @@ def list_posts(
         "asc",
         description="Dirección de orden",
     ),
+    db: Session = Depends(get_db),
 ):
 
-    results = BLOG_POST
+    results = select(PostORM)
     query = query or text
 
     if query:
-        results = [post for post in results if query.lower() in post["title"].lower()]
+        results = results.where(
+            PostORM.title.ilike(f"%{query}%")
+        )  # filtramos con la query
 
-    total = len(results)
+    total = db.scalar(select(func.count()).select_from(results.subquery())) or 0
     total_pages = ceil(total / per_page) if total > 0 else 0
 
-    if total_pages == 0:
-        current_pages = 1
+    current_pages = 1 if total_pages == 0 else min(page, total_pages)
+
+    if order_by == "id":
+        order_col = PostORM.id
     else:
-        current_pages = min(page, total_pages)
-    results = sorted(
-        results, key=lambda post: post[order_by], reverse=(direction == "desc")
+        order_col = func.lower(PostORM.title)
+
+    results = results.order_by(
+        order_col.asc() if direction == "asc" else order_col.desc()
     )
+    # results = sorted(
+    #     results, key=lambda post: post[order_by], reverse=(direction == "desc"))
     if total_pages == 0:
-        items = []
+        items = List[PostORM] = []
     else:
         start = (current_pages - 1) * per_page
-        items = results[start : start + per_page]
+        items = db.execute(results.limit(per_page).offset(start)).scalars().all()
+
     has_prev = current_pages > 1
     has_next = current_pages < total_pages if total_pages > 0 else False
     return PaginatedPost(
@@ -362,18 +370,22 @@ def get_post(
     return HTTPException(status_code=404, detail="Post no encontrado")
 
 
-@app.post("/posts", response_model=PostPublic, response_description="Post Creado(OK)")
-def create_post(post: PostCreate):
-    new_id = (BLOG_POST[-1]["id"] + 1) if BLOG_POST else 1
-    new_post = {
-        "id": new_id,
-        "title": post.title,
-        "content": post.content,
-        "tags": [tag.model_dump() for tag in post.tags],
-        "author": post.author.model_dump() if post.author else None,
-    }
-    BLOG_POST.append(new_post)
-    return new_post
+@app.post(
+    "/posts",
+    response_model=PostPublic,
+    response_description="Post Creado(OK)",
+    status_code=status.HTTP_201_CREATED,
+)
+def create_post(post: PostCreate, db: Session = Depends(get_db)):
+    new_post = PostORM(title=post.title, content=post.content)
+    try:
+        db.add(new_post)
+        db.commit()
+        db.refresh(new_post)
+        return new_post
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al crear el post")
 
 
 @app.put(
