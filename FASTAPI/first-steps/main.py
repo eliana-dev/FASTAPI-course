@@ -5,12 +5,22 @@ from typing import Optional, List, Union, Literal
 from pydantic import BaseModel, Field, field_validator, EmailStr, ConfigDict
 import uvicorn
 from math import ceil
-from sqlalchemy import create_engine, Integer, String, Text, DateTime, select, func
+from sqlalchemy import (
+    create_engine,
+    Integer,
+    String,
+    Text,
+    DateTime,
+    select,
+    func,
+    delete,
+)
 from sqlalchemy.orm import sessionmaker, Session, DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.exc import SQLAlchemyError
+from colorama import Fore
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")  ##motor://ruta
-print("Conectado a: ", DATABASE_URL)
+print(Fore.LIGHTBLUE_EX + "Conectado a: ", DATABASE_URL)
 
 engine_kwargs = {}
 
@@ -57,99 +67,6 @@ def get_db():
 
 ############# fin de db config ###################33
 app = FastAPI(title="Mini Blog")
-
-BLOG_POST = [
-    {
-        "id": 1,
-        "title": "Hola desde FastAPI",
-        "content": "Mi primer post con fastAPI",
-        "tags": [
-            {"name": "Python"},
-            {"name": "FastAPI"},
-            {"name": "Flask"},
-        ],
-    },
-    {
-        "id": 2,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 3,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-    },
-    {
-        "id": 4,
-        "title": "Hola desde FastAPI",
-        "content": "Mi primer post con fastAPI",
-        "tags": [
-            {"name": "Python"},
-            {"name": "FastAPI"},
-            {"name": "Flask"},
-        ],
-    },
-    {
-        "id": 5,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 6,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-    },
-    {
-        "id": 7,
-        "title": "Hola desde FastAPI",
-        "content": "Mi primer post con fastAPI",
-    },
-    {
-        "id": 8,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 9,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-        "tags": [
-            {"name": "Python"},
-            {"name": "FastAPI"},
-            {"name": "Flask"},
-        ],
-    },
-    {
-        "id": 10,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 11,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-    },
-    {
-        "id": 12,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 13,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-    },
-    {
-        "id": 14,
-        "title": "Me gusta el chocolate",
-        "content": "Mi segundo post con fastAPI",
-    },
-    {
-        "id": 15,
-        "title": "Holiwis yeii",
-        "content": "Mi tercer post con fastAPI",
-    },
-]
 
 
 class Tag(BaseModel):
@@ -223,6 +140,8 @@ class PostPublic(PostBase):  # hereda title y content
 class PostSummary(BaseModel):
     id: int
     title: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PaginatedPost(BaseModel):
@@ -306,7 +225,7 @@ def list_posts(
     # results = sorted(
     #     results, key=lambda post: post[order_by], reverse=(direction == "desc"))
     if total_pages == 0:
-        items = List[PostORM] = []
+        items = []
     else:
         start = (current_pages - 1) * per_page
         items = db.execute(results.limit(per_page).offset(start)).scalars().all()
@@ -355,19 +274,21 @@ def get_post(
         ge=1,
         title="ID del post",
         description="Identificador entero del post - mayor a 1",
-        example=1,
+        examples=1,
     ),
     include_content: Optional[bool] = Query(
         default=None, description="Bool para filtrar contenido"
     ),
+    db: Session = Depends(get_db),
 ):
-    for post in BLOG_POST:
-        if post["id"] == post_id:
-            if not include_content:
-                return {"id": post["id"], "title": post["title"]}
-            return post
+    post_find = select(PostORM).where(PostORM.id == post_id)
 
-    return HTTPException(status_code=404, detail="Post no encontrado")
+    post = db.execute(post_find).scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    if include_content:
+        return PostPublic.model_validate(post, from_attributes=True)
+    return PostSummary.model_validate(post, from_attributes=True)
 
 
 @app.post(
@@ -394,28 +315,49 @@ def create_post(post: PostCreate, db: Session = Depends(get_db)):
     response_description="Post actualizado",
     response_model_exclude_none=True,
 )
-def update_post(post_id: int, data: PostUpdate):
-    for post in BLOG_POST:
-        if post["id"] == post_id:
-            playload = data.model_dump(
-                exclude_unset=True,
-            )  # convierte a dict y excluye lo que no pones!(en vez de poner None)
-            if "title" in playload:
-                post["title"] = playload["title"]
-            if "content" in playload:
-                post["content"] = playload["content"]
-            return post
+def update_post(post_id: int, data: PostUpdate, db: Session = Depends(get_db)):
+    post = db.get(PostORM, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+    updates = data.model_dump(exclude_unset=True)
 
-    raise HTTPException(status_code=404, detail="Post no encontrado")
+    for key, value in updates.items():
+        setattr(post, key, value)
+
+    try:
+        db.add(post)
+        db.commit()
+        db.refresh(post)
+        return post
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al guardar los cambios")
+
+    # for post in BLOG_POST:
+    #     if post["id"] == post_id:
+    #         playload = data.model_dump(
+    #             exclude_unset=True,
+    #         )  # convierte a dict y excluye lo que no pones!(en vez de poner None)
+    #         if "title" in playload:
+    #             post["title"] = playload["title"]
+    #         if "content" in playload:
+    #             post["content"] = playload["content"]
+    #         return post
 
 
-@app.delete("/posts/{post_id}", status_code=204)
-def delete_post(post_id: int):
-    for index, post in enumerate(BLOG_POST):
-        if post["id"] == post_id:
-            BLOG_POST.pop(index)
-            return
-    raise HTTPException(status_code=404, detail="Post no encontrado")
+@app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(post_id: int, db: Session = Depends(get_db)):
+    post_to_delete = db.get(PostORM, post_id)
+
+    if not post_to_delete:
+        raise HTTPException(status_code=404, detail="Post no encontrado")
+
+    try:
+        db.delete(post_to_delete)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Error al eliminar el post")
 
 
 if __name__ == "__main__":
