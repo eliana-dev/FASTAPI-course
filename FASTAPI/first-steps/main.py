@@ -278,8 +278,6 @@ def list_posts(
     results = results.order_by(
         order_col.asc() if direction == "asc" else order_col.desc()
     )
-    # results = sorted(
-    #     results, key=lambda post: post[order_by], reverse=(direction == "desc"))
     if total_pages == 0:
         items = []
     else:
