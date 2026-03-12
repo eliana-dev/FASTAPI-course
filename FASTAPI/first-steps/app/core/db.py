@@ -1,10 +1,15 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase, Session
 
 
+BASE_DIR = Path(__file__).resolve().parents[2]
+load_dotenv(BASE_DIR / ".env")
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./blog.db")  ##motor://ruta
+DEFAULT_SQLITE_URL = f"sqlite:///{BASE_DIR / 'blog.db'}"
+DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)  ##motor://ruta
 
 
 engine_kwargs = {}
